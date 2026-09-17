@@ -5,7 +5,6 @@
 검사하고, 어긴 자리를 행 번호와 함께 보고합니다.
 
   python3 ko-lint.py 초안.md
-  python3 ko-lint.py --mode research 논문정리.md
   cat 초안.md | python3 ko-lint.py --json
   python3 ko-lint.py --selftest
 
@@ -149,7 +148,7 @@ DENSITY = [
      "쉼표를 빼거나 문장을 나누세요."),
 ]
 
-# 연구 모드: 음차한 1층 용어 → 영문
+# 음차한 1층 용어 → 영문
 TRANSLIT = {
     "어텐션": "attention",
     "셀프 어텐션": "self-attention",
@@ -175,19 +174,14 @@ TRANSLIT = {
 }
 
 ENG_HADA = re.compile(r"[A-Za-z][A-Za-z\-]{1,}(하다|한다|했|합니다|하고|하면|해서|하는|한\s|함)")
-# 한글 음절도 \w에 들어가므로 \b를 쓰지 않습니다. layer만 같은 형태를 놓칩니다.
-LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z0-9\-]{1,}")
-ENG_OK_IN_GENERAL = {"AI", "API", "PC", "OS", "URL", "CPU", "GPU", "IT", "UI", "LLM"}
-
 # 연구 글은 학술 정형 표현과 불확실성 표현을 더 허용합니다.
-MODE_THRESHOLD = {
-    "research": {"e-uihae": 3, "geot-ida": 3},
-}
+THRESHOLD_OVERRIDE = {"e-uihae": 3, "geot-ida": 3}
 
-CAPS = {  # (문장 최대 어절, 평균 어절 권장)
-    "general": (25, 18),
-    "research": (30, 21),
-}
+MAX_EOJEOL = 30   # 문장 최대 어절
+AVG_EOJEOL = 21   # 평균 어절 권장
+
+# 한글 음차 + 영문 병기: 같은 용어를 두 번 이상 병기하면 읽기가 끊깁니다.
+BYEONGGI = re.compile(r"([가-힣]{2,})\s*\(\s*([A-Za-z][A-Za-z \-]*)\s*\)")
 
 
 def find_su_issda(text):
@@ -207,7 +201,7 @@ def find_su_issda(text):
 
 # ---------------------------------------------------------------- 검사
 
-def check(text, path="<stdin>", mode="general", disabled=()):
+def check(text, path="<stdin>", disabled=()):
     masked = mask_code(text)
     findings = []
 
@@ -225,39 +219,42 @@ def check(text, path="<stdin>", mode="general", disabled=()):
 
     for start, para in paragraphs(masked):
         for rule, sev, pat, thresh, msg, fix in DENSITY:
-            thresh = MODE_THRESHOLD.get(mode, {}).get(rule, thresh)
+            thresh = THRESHOLD_OVERRIDE.get(rule, thresh)
             hits = list(re.finditer(pat, para))
             if len(hits) > thresh:
                 add(rule, sev, start + hits[0].start(),
                     f"{msg} 이 문단에 {len(hits)}회.", fix)
         su = find_su_issda(para)
-        if len(su) > (4 if mode == "research" else 2):
-            tail = ("연구 모드에서는 진짜 불확실성을 나타내는 자리를 그대로 둡니다. "
-                    "능력과 허가를 말하는 자리만 단언으로 바꾸세요."
-                    if mode == "research" else
-                    "단언으로 바꾸세요. 높일 수 있다 → 높인다.")
+        if len(su) > 4:
             add("su-issda", "S2", start + su[0],
                 f"'~할 수 있다'가 이 문단에 {len(su)}회. 영어 can의 직역입니다.",
-                tail)
-        if mode == "research":
-            for ko, en in TRANSLIT.items():
-                for m in re.finditer(re.escape(ko), para):
-                    add("translit-term", "S2", start + m.start(),
-                        f"1층 용어를 음차했습니다 — '{ko}'.",
-                        f"영문으로 쓰세요: {en}")
-            for m in ENG_HADA.finditer(para):
-                add("eng-hada", "S3", start + m.start(),
-                    f"영어 어근에 '-하다'를 직결했습니다 — '{m.group(0)}'.",
-                    "조사를 넣으세요. fine-tuning했다 → fine-tuning을 했다")
-        else:
-            latin = [w for w in LATIN_WORD.findall(para)
-                     if w.upper() not in ENG_OK_IN_GENERAL]
-            if len(latin) > 3:
-                add("eng-overload", "S3", start,
-                    f"일반 모드인데 영문 용어가 이 문단에 {len(latin)}회.",
-                    "한글로 풀어 쓰고, 꼭 필요한 용어만 한 번 괄호로 병기하세요.")
+                "진짜 불확실성을 나타내는 자리는 그대로 두고, 능력과 허가를 "
+                "말하는 자리만 단언으로 바꾸세요.")
+        for ko, en in TRANSLIT.items():
+            for m in re.finditer(re.escape(ko), para):
+                # 바로 뒤에 영문을 병기했으면 입문자용 정식 표기이므로 넘어갑니다.
+                if re.match(r"\s*\(\s*[A-Za-z]", para[m.end():m.end() + 8]):
+                    continue
+                add("translit-term", "S2", start + m.start(),
+                    f"1층 용어를 음차했습니다 — '{ko}'.",
+                    f"영문으로 쓰세요: {en}")
+        for m in ENG_HADA.finditer(para):
+            add("eng-hada", "S3", start + m.start(),
+                f"영어 어근에 '-하다'를 직결했습니다 — '{m.group(0)}'.",
+                "조사를 넣으세요. fine-tuning했다 → fine-tuning을 했다")
 
-    max_w, avg_w = CAPS[mode]
+    seen = {}
+    for m in BYEONGGI.finditer(masked):
+        key = m.group(2).strip().lower()
+        seen.setdefault(key, []).append(m)
+    for key, hits in seen.items():
+        if len(hits) > 1:
+            add("repeat-byeonggi", "S3", hits[1].start(),
+                f"같은 용어를 {len(hits)}번 병기했습니다 — '{hits[1].group(0)}'.",
+                "병기는 문서에서 처음 등장할 때 한 번만 하고, 그다음부터는 "
+                "한 표기로 고정하세요.")
+
+    max_w, avg_w = MAX_EOJEOL, AVG_EOJEOL
     sents = sentences(masked)
     if sents:
         lens = [len(s.split()) for s in sents]
@@ -265,7 +262,7 @@ def check(text, path="<stdin>", mode="general", disabled=()):
             if n > max_w:
                 pos = masked.find(s)
                 add("long-sentence", "S2", pos if pos >= 0 else 0,
-                    f"문장이 {n}어절입니다. {mode} 모드 상한은 {max_w}어절입니다.",
+                    f"문장이 {n}어절입니다. 상한은 {max_w}어절입니다.",
                     "문장을 나누세요. 한국어는 관계절을 겹쳐 쌓지 못합니다.")
         if mean(lens) > avg_w:
             add("avg-length", "S3", 0,
@@ -323,21 +320,21 @@ HEDGE = "이 설정은 학습을 발산시킬 수 있다.\n"
 def selftest():
     ok = True
 
-    got = {f["rule"] for f in check(BAD, "BAD", mode="research")}
+    got = {f["rule"] for f in check(BAD, "BAD")}
     want = {"double-passive", "e-isseoseo", "ai-ending", "translit-term"}
     missing = want - got
     if missing:
         print(f"FAIL: BAD 샘플에서 못 잡은 규칙 {sorted(missing)}")
         ok = False
 
-    findings = check(GOOD, "GOOD", mode="research")
+    findings = check(GOOD, "GOOD")
     hard = [f for f in findings if f["severity"] == "S1"]
     if hard:
         print(f"FAIL: GOOD 샘플에서 S1 오검출 {[f['rule'] for f in hard]}")
         ok = False
 
     # 추측 표현 1회는 잡지 않습니다. 확신의 세기는 내용이지 문체가 아닙니다.
-    if check(HEDGE, "HEDGE", mode="research"):
+    if check(HEDGE, "HEDGE"):
         print("FAIL: 단발 추측 표현을 잡았습니다")
         ok = False
 
@@ -352,9 +349,8 @@ def selftest():
 
 
 def main():
-    p = argparse.ArgumentParser(description="natural-korean-skills 기계적 검사기")
+    p = argparse.ArgumentParser(description="natural-korean-skills 기계적 검사기 (AI/CS 연구 글)")
     p.add_argument("files", nargs="*", help="검사할 파일. 없으면 stdin.")
-    p.add_argument("--mode", choices=["general", "research"], default="general")
     p.add_argument("--json", action="store_true")
     p.add_argument("--baseline", type=int, default=0, help="허용할 S1 건수")
     p.add_argument("--disable", default="", help="끌 규칙 id를 쉼표로 구분")
@@ -369,9 +365,9 @@ def main():
     if a.files:
         for path in a.files:
             with open(path, encoding="utf-8") as fh:
-                findings += check(fh.read(), path, a.mode, disabled)
+                findings += check(fh.read(), path, disabled)
     else:
-        findings += check(sys.stdin.read(), "<stdin>", a.mode, disabled)
+        findings += check(sys.stdin.read(), "<stdin>", disabled)
     return report(findings, a.json, a.baseline)
 
 
