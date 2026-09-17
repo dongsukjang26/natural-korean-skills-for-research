@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ko-lint.py — natural-korean-skills 스킬의 기계적 검사기.
+"""ko-lint.py — natural-korean-skills-for-research 스킬의 기계적 검사기.
 
 표준 라이브러리만 씁니다. 파일이나 stdin을 받아 번역투, AI 문체, 용어 표기를
 검사하고, 어긴 자리를 행 번호와 함께 보고합니다.
@@ -349,7 +349,7 @@ def selftest():
 
 
 def main():
-    p = argparse.ArgumentParser(description="natural-korean-skills 기계적 검사기 (AI/CS 연구 글)")
+    p = argparse.ArgumentParser(description="natural-korean-skills-for-research 기계적 검사기 (AI/CS 연구 글)")
     p.add_argument("files", nargs="*", help="검사할 파일. 없으면 stdin.")
     p.add_argument("--json", action="store_true")
     p.add_argument("--baseline", type=int, default=0, help="허용할 S1 건수")

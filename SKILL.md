@@ -1,5 +1,5 @@
 ---
-name: natural-korean-skills
+name: natural-korean-skills-for-research
 description: "AI와 CS 연구자를 위한 한국어 문체 스킬. 논문 정리, 실험 노트, 기술 문서, 설계 문서, 코드 리뷰, 동료에게 하는 개념 설명을 번역투 없는 한국어로 씁니다. attention, fine-tuning, baseline, throughput 같은 기술 용어는 영문 그대로 두고 문장 골격만 한국어로 씁니다. 수치와 확신의 세기를 바꾸지 않습니다. 트리거: 자연스러운 한국어로, 번역투 빼고, 논문 정리해줘, 실험 노트, 연구 노트, 기술 문서 작성, 설계 문서, 한국어로 설명해줘, Korean technical writing, Korean research writing. 학회 투고용 국문 논문 원고는 학회 지침이 우선이라 이 스킬을 쓰지 않습니다."
 version: 0.2.0
 ---

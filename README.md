@@ -1,4 +1,4 @@
-# natural-korean-skills
+# natural-korean-skills-for-research
 
 **AI와 CS 연구자를 위한 한국어 문체 스킬.** 논문 정리, 실험 노트, 기술 문서, 코드 리뷰, 동료에게 하는 개념 설명을 번역투 없는 한국어로 씁니다. 기술 용어는 영문 그대로 두고 문장 골격만 한국어로 씁니다.
 
@@ -131,7 +131,7 @@ LLM이 쓴 한국어는 대개 문법이 틀리지 않습니다. 맞춤법 검�
 ### npx skills
 
 ```bash
-npx skills add dongsukjang26/natural-korean-skills
+npx skills add dongsukjang26/natural-korean-skills-for-research
 ```
 
 [skills CLI](https://skills.sh/)가 GitHub에서 스킬을 받아 설정합니다. 설치 위치와 그 밖의 명령은 `npx skills --help`로 확인하세요.
@@ -139,7 +139,8 @@ npx skills add dongsukjang26/natural-korean-skills
 ### clone
 
 ```bash
-git clone https://github.com/dongsukjang26/natural-korean-skills ~/.claude/skills/natural-korean-skills
+git clone https://github.com/dongsukjang26/natural-korean-skills-for-research \
+  ~/.claude/skills/natural-korean-skills-for-research
 ```
 
 `~/.claude/skills/`에 두면 모든 프로젝트에서 씁니다. 특정 프로젝트에서만 쓰려면 그 프로젝트의 `.claude/skills/`에 둡니다. `git pull`로 갱신됩니다.
